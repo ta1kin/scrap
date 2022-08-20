@@ -1,0 +1,54 @@
+from bs4 import BeautifulSoup
+
+
+def get_data(url, headers):
+    # Получим код страницы
+    req = requests.get(url=url, headers=headers)
+    response = req.text
+    with open("index.html", "w", encoding="utf-8") as file:
+      file.write(response)
+
+    with open("index.html", encoding="utf-8") as file:
+        scr = file.read()
+
+    soup = BeautifulSoup(scr, "lxml")
+    catalog = soup.find_all("div", class_="_2-xNBNeSsE")
+    all_category = []
+    for cont in catalog:
+        category_name = cont.find("div", class_="t-xl").text.strip()
+        products = cont.find("div", class_="_3Yq-6E4qgh").find_all("a")
+        products_in_category = []
+        for product in products:
+            link = "https://www.kfc.ru" + product.get("href")
+            try:
+                product_name = product.find("div", class_="_14ZQf5wtqx").text.strip()
+            except:
+                product_name = None
+            try:
+                product_price = product.find("div", class_="_3cJe_ZvVwf").text.strip()
+            except:
+                product_price = "Будет позже"
+            this_product = {
+                "Название": product_name,
+                "Цена": product_price,
+                "Ссылка": link
+            }
+            products_in_category.append(this_product)
+        category = {
+            category_name: products_in_category
+        }
+        all_category.append(category)
+    with open("result.json", "w", encoding="utf-8") as file:
+        json.dump(all_category, file, indent=4, ensure_ascii=False)
+
+
+def main():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0"
+    }
+    url = "https://www.kfc.ru/"
+    get_data(url=url, headers=headers)
+
+
+if __name__ == "__main__":
+    main()
