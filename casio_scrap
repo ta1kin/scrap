@@ -1,0 +1,84 @@
+import json
+import time
+
+import requests
+from bs4 import BeautifulSoup
+
+headers = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0"
+}
+url = "https://shop.casio.ru/catalog/"
+
+# Получим страницу каталога часов
+req = requests.get(url=url, headers=headers)
+scr = req.text
+with open("index.html", "w", encoding="utf-8") as file:
+    file.write(scr)
+
+# Получим список, в который закинем ссылки на все часы в каталоге
+with open("index.html", encoding="utf-8") as file:
+    scr = file.read()
+soup = BeautifulSoup(scr, "lxml")
+pagination_count = int(soup.find("div", class_="bx-pagination-container").find_all("li")[-2].text)
+all_clocks_url = []
+for i in range(1, pagination_count + 1):
+    url = f"https://shop.casio.ru/catalog/?PAGEN_1={i}"
+    req = requests.get(url=url, headers=headers)
+    scr = req.text
+    soup = BeautifulSoup(scr, "lxml")
+    clocks_url = soup.find_all("a", class_="product-item__link")
+    for item in clocks_url:
+        all_clocks_url.append("https://shop.casio.ru" + item.get("href"))
+
+# Закинем наш список в JSON
+with open("clocks_url.json", "w", encoding="utf-8") as file:
+    json.dump(all_clocks_url, file, indent=4, ensure_ascii=False)
+
+# Из JSON файла возьмём список ссылок
+with open("clocks_url.json", encoding="utf-8") as file:
+    clocks_url = json.load(file)
+
+# Итерируясь по списку будем по очереди заходить на все страницы часов и сохранять данные в общий список
+total_clocks = []
+iteration_count = len(clocks_url)
+print(f"{'-' * 10}Процесс сбора информации запущен, необходимо провести #{iteration_count} итераций{'-' * 10}")
+count = 0
+for clock_url in clocks_url:
+    req = requests.get(url=clock_url, headers=headers)
+    scr = req.text
+    soup = BeautifulSoup(scr, "lxml")
+    clock_card_info = soup.find("div", class_="product-card__info")
+    clock_name_m = clock_card_info.find("h1", class_="product-card__title").text.strip().split()
+    clock_name = " ".join(clock_name_m[:-1])
+    clock_model = clock_name_m[-1]
+    clock_status = clock_card_info.find("div", class_="availability__text").text.strip()
+    parameters = clock_card_info.find("div", class_="product-card__accordion").find_all("tr")
+    clock_parameters = {}
+    for par in parameters:
+        par_s = par.find_all("td")
+        clock_parameters[par_s[0].text.strip()] = " ".join(par_s[1].text.strip().split())
+    all_tech = clock_card_info.find("div", class_="product-card__accordion").find_next_sibling().find_all("div",
+                                                                                                          class_="tech__item")
+    clock_tech = []
+    for tech in all_tech:
+        clock_tech.append(tech.find("h3", class_="tech__item-title").text.strip())
+    this_clock = {
+        "Название": clock_name,
+        "Модель": clock_model,
+        "Статус": clock_status,
+        "Характеристики": clock_parameters,
+        "Технологии": clock_tech
+    }
+    total_clocks.append(this_clock)
+    iteration_count -= 1
+    count += 1
+    if iteration_count == 0:
+        print(f"{'-' * 10}Процесс сканирования завершён, результаты упакованы в JSON файл{'-' * 10}")
+    else:
+        print(f"{'-' * 10}#{count} итераций проведено, осталось провести #{iteration_count} итераций{'-' * 10}")
+    time.sleep(2)
+
+# Запишем полученный список в JSON файл
+with open("result.json", "w", encoding="utf-8") as file:
+    json.dump(total_clocks, file, indent=4, ensure_ascii=False)
