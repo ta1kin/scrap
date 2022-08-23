@@ -1,0 +1,100 @@
+import json
+
+from bs4 import BeautifulSoup
+import requests
+import time
+import random
+
+
+def get_data(headers):
+    all_flats = []
+    for i in range(1, 101):
+        print(f"[INFO]--- Сканируем страницу #{i} ---[INFO]")
+        url = f"https://www.avito.ru/sankt-peterburg/kvartiry/sdam/na_dlitelnyy_srok-ASgBAgICAkSSA8gQ8AeQUg?cd=1&p={i}"
+        req = requests.get(url=url, headers=headers).text
+        with open("index.html", "w") as file:
+            file.write(req)
+        soup = BeautifulSoup(req, "lxml")
+        floats = soup.find_all("div", class_="iva-item-root-_lk9K photo-slider-slider-S15A_ iva-item-list-rfgcH iva-item-redesign-rop6P iva-item-responsive-_lbhG items-item-My3ih items-listItem-Gd1jN js-catalog-item-enum")
+        for flat in floats:
+            flat_title = flat.find("div", class_="iva-item-content-rejJg").find("h3", class_="title-root-zZCwT iva-item-title-py3i_ title-listRedesign-_rejR title-root_maxHeight-X6PsH text-text-LurtD text-size-s-BxGpL text-bold-SinUO").text.strip().split()
+            if len(flat_title) == 6:
+                try:
+                    flat_type = int(flat_title[0].replace("-к.", ""))
+                except:
+                    flat_type = "Не указано"
+                try:
+                    flat_square = float(flat_title[2].replace(",", "."))
+                except:
+                    flat_square = "Не указано"
+                try:
+                    flat_square_text = flat_title[3]
+                except:
+                    flat_square_text = "Не указано"
+                try:
+                    number_flats = flat_title[4]
+                except:
+                    number_flats = "Не указано"
+            else:
+                try:
+                    flat_type = int(flat_title[0].replace("-к.", ""))
+                except:
+                    flat_type = "Не указано"
+                try:
+                    flat_square = float(flat_title[1].replace(",", "."))
+                except:
+                    flat_square = "Не указано"
+                try:
+                    flat_square_text = flat_title[3]
+                except:
+                    flat_square_text = "Не указано"
+                try:
+                    number_flats = flat_title[3]
+                except:
+                    number_flats = "Не указано"
+            flat_price_text = flat.find("div", class_="iva-item-priceStep-uq2CQ").find("span", class_="price-text-_YGDY text-text-LurtD text-size-s-BxGpL").text.strip().split()
+            try:
+                flat_price = int(flat_price_text[0] + flat_price_text[1])
+            except:
+                flat_price = "Не указано"
+            try:
+                flat_price_text = f"{flat_price_text[2]} {flat_price_text[3]} {flat_price_text[4]}"
+            except:
+                flat_price_text = "Не указано"
+            try:
+                flat_address = flat.find("div", class_="iva-item-developmentNameStep-qPkq2").find(class_="geo-address-fhHd0 text-text-LurtD text-size-s-BxGpL").text.strip()
+            except:
+                flat_address = "Не указано"
+            try:
+                flat_url = "https://www.avito.ru" + flat.find(class_="iva-item-titleStep-pdebR").find("a").get("href")
+            except:
+                flat_url = "Не указано"
+            flat_dict = {
+                "Адрес": flat_address,
+                "Количество комнат": flat_type,
+                f"Площадь в ({flat_square_text})": flat_square,
+                "Количество этажей": number_flats,
+                f"Цена в ({flat_price_text})": flat_price,
+                "Ссылка": flat_url
+            }
+            all_flats.append(flat_dict)
+        time.sleep(random.randint(2, 4))
+    all_flats.append(
+        {
+            "Общее количество просмотренных квартир": len(all_flats)
+        }
+    )
+    with open("result.json", "w") as file:
+        json.dump(all_flats, file, indent=4, ensure_ascii=False)
+
+
+def main():
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0"
+    }
+    get_data(headers)
+
+
+if __name__ == "__main__":
+    main()
